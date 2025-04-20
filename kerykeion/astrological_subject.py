@@ -37,7 +37,7 @@ from kerykeion.utilities import (
 from pathlib import Path
 from typing import Union, get_args
 
-DEFAULT_GEONAMES_USERNAME = "century.boy"
+DEFAULT_GEONAMES_USERNAME = "bartix"
 DEFAULT_SIDEREAL_MODE: SiderealMode = "FAGAN_BRADLEY"
 DEFAULT_HOUSES_SYSTEM_IDENTIFIER: HousesSystemIdentifier = "P"
 DEFAULT_ZODIAC_TYPE: ZodiacType = "Tropic"
