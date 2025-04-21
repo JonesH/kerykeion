@@ -8,16 +8,14 @@ import logging
 import swisseph as swe
 from typing import get_args, Union, Literal
 
-from kerykeion.charts.chart_data import KerykeionChartData
+from kerykeion.charts.chart_data import KerykeionChartSettingsMixin
 from kerykeion.settings.config_constants import DEFAULT_ACTIVE_ASPECTS, DEFAULT_ACTIVE_POINTS
 from kerykeion.settings.kerykeion_settings import get_settings
-from kerykeion.aspects.synastry_aspects import SynastryAspects
-from kerykeion.aspects.natal_aspects import NatalAspects
 from kerykeion.astrological_subject import AstrologicalSubject
-from kerykeion.kr_types import KerykeionException, ChartType, KerykeionPointModel, Sign, ActiveAspect
+from kerykeion.kr_types import ChartType, Sign, ActiveAspect
 from kerykeion.kr_types import ChartTemplateDictionary
 from kerykeion.kr_types.kr_models import AstrologicalSubjectModel, CompositeSubjectModel
-from kerykeion.kr_types.settings_models import KerykeionSettingsCelestialPointModel, KerykeionSettingsModel
+from kerykeion.kr_types.settings_models import KerykeionSettingsModel
 from kerykeion.kr_types.kr_literals import KerykeionChartTheme, KerykeionChartLanguage, AxialCusps, Planet
 from kerykeion.charts.charts_utils import (
     draw_zodiac_slice,
@@ -45,7 +43,7 @@ from scour.scour import scourString
 from string import Template
 from datetime import datetime
 
-class KerykeionChartSVG(KerykeionChartData):
+class KerykeionChartSVG:
     """
     KerykeionChartSVG generates astrological chart visualizations as SVG files.
 
@@ -120,9 +118,6 @@ class KerykeionChartSVG(KerykeionChartData):
     """
 
     # Constants
-    _BASIC_CHART_VIEWBOX = "0 0 820 550.0"
-    _WIDE_CHART_VIEWBOX = "0 0 1200 546.0"
-    _TRANSIT_CHART_WITH_TABLE_VIWBOX = "0 0 960 546.0"
 
     def __init__(
             self,
@@ -150,47 +145,6 @@ class KerykeionChartSVG(KerykeionChartData):
             active_points=active_points,
             active_aspects=active_aspects,
         )
-
-    def set_up_theme(self, theme: KerykeionChartTheme | None = None) -> None:
-        """
-        Load and apply a CSS theme for the chart visualization.
-
-        Args:
-            theme (KerykeionChartTheme or None): Name of the theme to apply. If None, no CSS is applied.
-        """
-        if theme is None:
-            self.color_style_tag = ""
-            return
-
-        theme_dir = Path(__file__).parent / "themes"
-
-        with open(theme_dir / f"{theme}.css", "r") as f:
-            self.color_style_tag = f.read()
-
-    def set_output_directory(self, dir_path: Path) -> None:
-        """
-        Set the directory where generated SVG files will be saved.
-
-        Args:
-            dir_path (Path): Target directory for SVG output.
-        """
-        self.output_directory = dir_path
-        logging.info(f"Output direcotry set to: {self.output_directory}")
-
-    def parse_json_settings(self, settings_file_or_dict: Path | dict | KerykeionSettingsModel | None) -> None:
-        """
-        Load and parse chart configuration settings.
-
-        Args:
-            settings_file_or_dict (Path, dict, or KerykeionSettingsModel):
-                Source for custom chart settings.
-        """
-        settings = get_settings(settings_file_or_dict)
-
-        self.language_settings = settings["language_settings"][self.chart_language]
-        self.chart_colors_settings = settings["chart_colors"]
-        self.planets_settings = settings["celestial_points"]
-        self.aspects_settings = settings["aspects"]
 
     def _draw_zodiac_circle_slices(self, r):
         """
