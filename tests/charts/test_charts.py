@@ -1,5 +1,5 @@
 from pathlib import Path
-from kerykeion import AstrologicalSubject, KerykeionChartSVG, CompositeSubjectFactory
+from kerykeion import AstrologicalSubject, CompositeSubjectFactory, KerykeionChartSVG
 
 
 class TestCharts:
