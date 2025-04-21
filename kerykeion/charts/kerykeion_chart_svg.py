@@ -6,8 +6,10 @@
 
 import logging
 import swisseph as swe
-from typing import get_args
+from typing import get_args, Union, Literal
 
+from kerykeion.charts.chart_data import KerykeionChartData
+from kerykeion.settings.config_constants import DEFAULT_ACTIVE_ASPECTS, DEFAULT_ACTIVE_POINTS
 from kerykeion.settings.kerykeion_settings import get_settings
 from kerykeion.aspects.synastry_aspects import SynastryAspects
 from kerykeion.aspects.natal_aspects import NatalAspects
@@ -38,14 +40,12 @@ from kerykeion.charts.charts_utils import (
 )
 from kerykeion.charts.draw_planets import draw_planets # type: ignore
 from kerykeion.utilities import get_houses_list, inline_css_variables_in_svg
-from kerykeion.settings.config_constants import DEFAULT_ACTIVE_POINTS, DEFAULT_ACTIVE_ASPECTS
 from pathlib import Path
 from scour.scour import scourString
 from string import Template
-from typing import Union, List, Literal
 from datetime import datetime
 
-class KerykeionChartSVG:
+class KerykeionChartSVG(KerykeionChartData):
     """
     KerykeionChartSVG generates astrological chart visualizations as SVG files.
 
@@ -124,220 +124,34 @@ class KerykeionChartSVG:
     _WIDE_CHART_VIEWBOX = "0 0 1200 546.0"
     _TRANSIT_CHART_WITH_TABLE_VIWBOX = "0 0 960 546.0"
 
-    _DEFAULT_HEIGHT = 550
-    _DEFAULT_FULL_WIDTH = 1200
-    _DEFAULT_NATAL_WIDTH = 820
-    _DEFAULT_FULL_WIDTH_WITH_TABLE = 960
-    _PLANET_IN_ZODIAC_EXTRA_POINTS = 10
-
-    # Set at init
-    first_obj: Union[AstrologicalSubject, AstrologicalSubjectModel]
-    second_obj: Union[AstrologicalSubject, AstrologicalSubjectModel, None]
-    chart_type: ChartType
-    new_output_directory: Union[Path, None]
-    new_settings_file: Union[Path, None, KerykeionSettingsModel, dict]
-    output_directory: Path
-    new_settings_file: Union[Path, None, KerykeionSettingsModel, dict]
-    theme: Union[KerykeionChartTheme, None]
-    double_chart_aspect_grid_type: Literal["list", "table"]
-    chart_language: KerykeionChartLanguage
-    active_points: List[Union[Planet, AxialCusps]]
-    active_aspects: List[ActiveAspect]
-
-    # Internal properties
-    fire: float
-    earth: float
-    air: float
-    water: float
-    first_circle_radius: float
-    second_circle_radius: float
-    third_circle_radius: float
-    width: Union[float, int]
-    language_settings: dict
-    chart_colors_settings: dict
-    planets_settings: dict
-    aspects_settings: dict
-    user: Union[AstrologicalSubject, AstrologicalSubjectModel, CompositeSubjectModel]
-    available_planets_setting: List[KerykeionSettingsCelestialPointModel]
-    height: float
-    location: str
-    geolat: float
-    geolon: float
-    template: str
-
     def __init__(
-        self,
-        first_obj: Union[AstrologicalSubject, AstrologicalSubjectModel, CompositeSubjectModel],
-        chart_type: ChartType = "Natal",
-        second_obj: Union[AstrologicalSubject, AstrologicalSubjectModel, None] = None,
-        new_output_directory: Union[str, None] = None,
-        new_settings_file: Union[Path, None, KerykeionSettingsModel, dict] = None,
-        theme: Union[KerykeionChartTheme, None] = "classic",
-        double_chart_aspect_grid_type: Literal["list", "table"] = "list",
-        chart_language: KerykeionChartLanguage = "EN",
-        active_points: List[Union[Planet, AxialCusps]] = DEFAULT_ACTIVE_POINTS,
-    active_aspects: List[ActiveAspect] = DEFAULT_ACTIVE_ASPECTS,
+            self,
+            first_obj: Union[AstrologicalSubject, AstrologicalSubjectModel, CompositeSubjectModel],
+            chart_type: ChartType = "Natal",
+            second_obj: Union[AstrologicalSubject, AstrologicalSubjectModel, None] = None,
+            new_output_directory: str | None = None,
+            new_settings_file: Union[Path, None, KerykeionSettingsModel, dict] = None,
+            theme: Union[KerykeionChartTheme, None] = "classic",
+            double_chart_aspect_grid_type: Literal["list", "table"] = "list",
+            chart_language: KerykeionChartLanguage = "EN",
+            active_points: list[Union[Planet, AxialCusps]] = DEFAULT_ACTIVE_POINTS,
+            active_aspects: list[ActiveAspect] = DEFAULT_ACTIVE_ASPECTS,
     ):
-        """
-        Initialize the chart generator with subject data and configuration options.
+        # Convert to keyword arguments for BaseModel
+        super().__init__(
+            first_obj=first_obj,
+            chart_type=chart_type,
+            second_obj=second_obj,
+            new_output_directory=new_output_directory,
+            new_settings_file=new_settings_file,
+            theme=theme,
+            double_chart_aspect_grid_type=double_chart_aspect_grid_type,
+            chart_language=chart_language,
+            active_points=active_points,
+            active_aspects=active_aspects,
+        )
 
-        Args:
-            first_obj (AstrologicalSubject, AstrologicalSubjectModel, or CompositeSubjectModel):
-                Primary astrological subject instance.
-            chart_type (ChartType, optional):
-                Type of chart to generate (e.g., 'Natal', 'Transit').
-            second_obj (AstrologicalSubject or AstrologicalSubjectModel, optional):
-                Secondary subject for Transit or Synastry charts.
-            new_output_directory (str or Path, optional):
-                Base directory to save generated SVG files.
-            new_settings_file (Path, dict, or KerykeionSettingsModel, optional):
-                Custom settings source for chart colors, fonts, and aspects.
-            theme (KerykeionChartTheme or None, optional):
-                CSS theme to apply; None for default styling.
-            double_chart_aspect_grid_type (Literal['list','table'], optional):
-                Layout style for double-chart aspect grids ('list' or 'table').
-            chart_language (KerykeionChartLanguage, optional):
-                Language code for chart labels (e.g., 'EN', 'IT').
-            active_points (List[Planet or AxialCusps], optional):
-                Celestial points to include in the chart visualization.
-            active_aspects (List[ActiveAspect], optional):
-                Aspects to calculate, each defined by name and orb.
-        """
-        home_directory = Path.home()
-        self.new_settings_file = new_settings_file
-        self.chart_language = chart_language
-        self.active_points = active_points
-        self.active_aspects = active_aspects
-
-        if new_output_directory:
-            self.output_directory = Path(new_output_directory)
-        else:
-            self.output_directory = home_directory
-
-        self.parse_json_settings(new_settings_file)
-        self.chart_type = chart_type
-
-        # Kerykeion instance
-        self.user = first_obj
-
-        self.available_planets_setting = []
-        for body in self.planets_settings:
-            if body["name"] not in active_points:
-                continue
-            else:
-                body["is_active"] = True
-
-            self.available_planets_setting.append(body)
-
-        # Available bodies
-        available_celestial_points_names = []
-        for body in self.available_planets_setting:
-            available_celestial_points_names.append(body["name"].lower())
-
-        self.available_kerykeion_celestial_points: list[KerykeionPointModel] = []
-        for body in available_celestial_points_names:
-            self.available_kerykeion_celestial_points.append(self.user.get(body))
-
-        # Makes the sign number list.
-        if self.chart_type == "Natal" or self.chart_type == "ExternalNatal":
-            natal_aspects_instance = NatalAspects(
-                self.user, new_settings_file=self.new_settings_file,
-                active_points=active_points,
-                active_aspects=active_aspects,
-            )
-            self.aspects_list = natal_aspects_instance.relevant_aspects
-
-        elif self.chart_type == "Transit" or self.chart_type == "Synastry":
-            if not second_obj:
-                raise KerykeionException("Second object is required for Transit or Synastry charts.")
-
-            # Kerykeion instance
-            self.t_user = second_obj
-
-            # Aspects
-            if self.chart_type == "Transit":
-                synastry_aspects_instance = SynastryAspects(
-                    self.t_user,
-                    self.user,
-                    new_settings_file=self.new_settings_file,
-                    active_points=active_points,
-                    active_aspects=active_aspects,
-                )
-
-            else:
-                synastry_aspects_instance = SynastryAspects(
-                    self.user,
-                    self.t_user,
-                    new_settings_file=self.new_settings_file,
-                    active_points=active_points,
-                    active_aspects=active_aspects,
-                )
-
-            self.aspects_list = synastry_aspects_instance.relevant_aspects
-
-            self.t_available_kerykeion_celestial_points = []
-            for body in available_celestial_points_names:
-                self.t_available_kerykeion_celestial_points.append(self.t_user.get(body))
-
-        elif self.chart_type == "Composite":
-            if not isinstance(first_obj, CompositeSubjectModel):
-                raise KerykeionException("First object must be a CompositeSubjectModel instance.")
-
-            self.aspects_list = NatalAspects(self.user, new_settings_file=self.new_settings_file, active_points=active_points).relevant_aspects
-
-        # Double chart aspect grid type
-        self.double_chart_aspect_grid_type = double_chart_aspect_grid_type
-
-        # screen size
-        self.height = self._DEFAULT_HEIGHT
-        if self.chart_type == "Synastry" or self.chart_type == "Transit":
-            self.width = self._DEFAULT_FULL_WIDTH
-        elif self.double_chart_aspect_grid_type == "table" and self.chart_type == "Transit":
-            self.width = self._DEFAULT_FULL_WIDTH_WITH_TABLE
-        else:
-            self.width = self._DEFAULT_NATAL_WIDTH
-
-        if self.chart_type in ["Natal", "ExternalNatal", "Synastry"]:
-            self.location = self.user.city
-            self.geolat = self.user.lat
-            self.geolon =  self.user.lng
-
-        elif self.chart_type == "Composite":
-            self.location = ""
-            self.geolat = (self.user.first_subject.lat + self.user.second_subject.lat) / 2
-            self.geolon = (self.user.first_subject.lng + self.user.second_subject.lng) / 2
-
-        elif self.chart_type in ["Transit"]:
-            self.location = self.t_user.city
-            self.geolat = self.t_user.lat
-            self.geolon = self.t_user.lng
-            self.t_name = self.language_settings["transit_name"]
-
-        # Default radius for the chart
-        self.main_radius = 240
-
-        # Set circle radii based on chart type
-        if self.chart_type == "ExternalNatal":
-            self.first_circle_radius, self.second_circle_radius, self.third_circle_radius = 56, 92, 112
-        else:
-            self.first_circle_radius, self.second_circle_radius, self.third_circle_radius = 0, 36, 120
-
-        # Initialize element points
-        self.fire = 0.0
-        self.earth = 0.0
-        self.air = 0.0
-        self.water = 0.0
-
-        # Calculate element points from planets
-        self._calculate_elements_points_from_planets()
-
-        # Set up theme
-        if theme not in get_args(KerykeionChartTheme) and theme is not None:
-            raise KerykeionException(f"Theme {theme} is not available. Set None for default theme.")
-
-        self.set_up_theme(theme)
-
-    def set_up_theme(self, theme: Union[KerykeionChartTheme, None] = None) -> None:
+    def set_up_theme(self, theme: KerykeionChartTheme | None = None) -> None:
         """
         Load and apply a CSS theme for the chart visualization.
 
@@ -363,7 +177,7 @@ class KerykeionChartSVG:
         self.output_directory = dir_path
         logging.info(f"Output direcotry set to: {self.output_directory}")
 
-    def parse_json_settings(self, settings_file_or_dict: Union[Path, dict, KerykeionSettingsModel, None]) -> None:
+    def parse_json_settings(self, settings_file_or_dict: Path | dict | KerykeionSettingsModel | None) -> None:
         """
         Load and parse chart configuration settings.
 
